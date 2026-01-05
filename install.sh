@@ -19,8 +19,12 @@ if ! command -v go >/dev/null 2>&1; then
   export PATH=$PATH:/usr/local/go/bin
 fi
 
-echo "[TunnelZero] Building application..."
+echo "[TunnelZero] Fetching Go dependencies..."
 cd "$(dirname "$0")"
+/usr/local/go/bin/go mod tidy
+
+
+echo "[TunnelZero] Building application..."
 /usr/local/go/bin/go build -o tunnelzero
 
 echo "[TunnelZero] Starting installer..."
