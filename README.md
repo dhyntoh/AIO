@@ -56,7 +56,7 @@ sudo bash install.sh
 - Requests SSL certificates via Let's Encrypt
 - Enables BBR
 - Downloads Xray and Hysteria 2 binaries
-- Optionally downloads ZiVPN if `ZIVPN_URL` is provided in the environment
+- Installs ZiVPN UDP module and configures default password list (`ZIVPN_PASSWORDS`, default `zi`)
 - Writes Fail2Ban filter/jail for auth failures
 
 ## Database

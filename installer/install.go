@@ -2,6 +2,7 @@ package installer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -46,7 +47,7 @@ func runAptUpdate(ctx context.Context, _ Config) error {
 }
 
 func installDependencies(ctx context.Context, _ Config) error {
-	packages := []string{"certbot", "socat", "cron", "fail2ban", "vnstat", "unzip"}
+	packages := []string{"certbot", "socat", "cron", "fail2ban", "vnstat", "unzip", "openssl", "ufw"}
 	args := append([]string{"install", "-y"}, packages...)
 	return runCommand(ctx, "apt-get", args...)
 }
@@ -113,16 +114,119 @@ func installHysteria(ctx context.Context, _ Config) error {
 }
 
 func installZiVPN(ctx context.Context, _ Config) error {
-	url := os.Getenv("ZIVPN_URL")
-	if url == "" {
-		fmt.Println("ZiVPN download URL not set, skipping install. Set ZIVPN_URL to enable.")
-		return nil
-	}
-	path := "/usr/local/bin/zivpn"
-	if err := downloadFile(ctx, url, path); err != nil {
+	fmt.Println("Installing ZiVPN UDP module...")
+	if err := runCommand(ctx, "apt-get", "upgrade", "-y"); err != nil {
 		return err
 	}
-	return os.Chmod(path, 0o755)
+	_ = runCommand(ctx, "systemctl", "stop", "zivpn.service")
+
+	if err := downloadFile(ctx, "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64", "/usr/local/bin/zivpn"); err != nil {
+		return err
+	}
+	if err := os.Chmod("/usr/local/bin/zivpn", 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/zivpn", 0o755); err != nil {
+		return err
+	}
+	if err := downloadFile(ctx, "https://raw.githubusercontent.com/zahidbd2/udp-zivpn/main/config.json", "/etc/zivpn/config.json"); err != nil {
+		return err
+	}
+
+	if err := runCommand(ctx, "openssl", "req", "-new", "-newkey", "rsa:4096", "-days", "365", "-nodes", "-x509", "-subj", "/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=zivpn", "-keyout", "/etc/zivpn/zivpn.key", "-out", "/etc/zivpn/zivpn.crt"); err != nil {
+		return err
+	}
+
+	if err := runCommand(ctx, "sysctl", "-w", "net.core.rmem_max=16777216"); err != nil {
+		return err
+	}
+	if err := runCommand(ctx, "sysctl", "-w", "net.core.wmem_max=16777216"); err != nil {
+		return err
+	}
+
+	service := `[Unit]
+Description=zivpn VPN Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/zivpn
+ExecStart=/usr/local/bin/zivpn server -c /etc/zivpn/config.json
+Restart=always
+RestartSec=3
+Environment=ZIVPN_LOG_LEVEL=info
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+`
+	if err := os.WriteFile("/etc/systemd/system/zivpn.service", []byte(service), 0o644); err != nil {
+		return err
+	}
+
+	if err := updateZiVPNPasswords("/etc/zivpn/config.json"); err != nil {
+		return err
+	}
+
+	if err := runCommand(ctx, "systemctl", "enable", "zivpn.service"); err != nil {
+		return err
+	}
+	if err := runCommand(ctx, "systemctl", "start", "zivpn.service"); err != nil {
+		return err
+	}
+	if err := runCommand(ctx, "bash", "-c", "iptables -t nat -A PREROUTING -i $(ip -4 route ls|grep default|grep -Po '(?<=dev )(\\S+)'|head -1) -p udp --dport 6000:19999 -j DNAT --to-destination :5667"); err != nil {
+		return err
+	}
+	_ = runCommand(ctx, "ufw", "allow", "6000:19999/udp")
+	_ = runCommand(ctx, "ufw", "allow", "5667/udp")
+
+	fmt.Println("ZiVPN UDP Installed")
+	return nil
+}
+
+func updateZiVPNPasswords(path string) error {
+	type config struct {
+		Config []string `json:"config"`
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var cfg config
+	if err := json.Unmarshal(content, &cfg); err != nil {
+		return err
+	}
+	passwords := parseZiVPNPasswords(os.Getenv("ZIVPN_PASSWORDS"))
+	cfg.Config = passwords
+	updated, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, updated, 0o644)
+}
+
+func parseZiVPNPasswords(input string) []string {
+	if strings.TrimSpace(input) == "" {
+		return []string{"zi"}
+	}
+	parts := strings.Split(input, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	if len(out) == 1 {
+		out = append(out, out[0])
+	}
+	if len(out) == 0 {
+		return []string{"zi"}
+	}
+	return out
 }
 
 func configureFail2Ban(_ context.Context, _ Config) error {
