@@ -35,6 +35,8 @@ If your VPS is empty, run the bootstrap installer to install Go and build the ap
 sudo bash install.sh
 ```
 
+> Note: The installer enables CGO and installs `libsqlite3-dev` so the SQLite driver can initialize correctly.
+
 3. **Follow the prompts**
 
    - Installation Token: `5407046882`

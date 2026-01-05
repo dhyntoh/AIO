@@ -8,7 +8,7 @@ fi
 
 echo "[TunnelZero] Preparing system..."
 apt-get update
-apt-get install -y curl wget ca-certificates unzip git
+apt-get install -y curl wget ca-certificates unzip git build-essential pkg-config libsqlite3-dev
 
 if ! command -v go >/dev/null 2>&1; then
   echo "[TunnelZero] Installing Go 1.22.4..."
@@ -24,8 +24,8 @@ cd "$(dirname "$0")"
 /usr/local/go/bin/go mod tidy
 
 
-echo "[TunnelZero] Building application..."
-/usr/local/go/bin/go build -o tunnelzero
+echo "[TunnelZero] Building application (CGO enabled for SQLite)..."
+CGO_ENABLED=1 /usr/local/go/bin/go build -o tunnelzero
 
 echo "[TunnelZero] Starting installer..."
 ./tunnelzero
