@@ -113,7 +113,11 @@ func installHysteria(ctx context.Context, _ Config) error {
 }
 
 func installZiVPN(ctx context.Context, _ Config) error {
-	url := "https://example.com/zivpn/latest/zivpn"
+	url := os.Getenv("ZIVPN_URL")
+	if url == "" {
+		fmt.Println("ZiVPN download URL not set, skipping install. Set ZIVPN_URL to enable.")
+		return nil
+	}
 	path := "/usr/local/bin/zivpn"
 	if err := downloadFile(ctx, url, path); err != nil {
 		return err
