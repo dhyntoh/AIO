@@ -32,6 +32,9 @@ func RefreshHysteriaConfig(db *gorm.DB, domain string) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll("/etc/hysteria", 0o755); err != nil {
+		return err
+	}
 	return os.WriteFile("/etc/hysteria/config.yaml", config, 0o644)
 }
 

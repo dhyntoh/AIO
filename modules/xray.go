@@ -36,6 +36,9 @@ func RefreshXrayConfig(db *gorm.DB, domain string) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll("/etc/xray", 0o755); err != nil {
+		return err
+	}
 	return os.WriteFile("/etc/xray/config.json", config, 0o644)
 }
 
