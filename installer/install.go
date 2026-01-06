@@ -167,6 +167,10 @@ WantedBy=multi-user.target
 		return err
 	}
 
+	if err := runCommand(ctx, "systemctl", "daemon-reload"); err != nil {
+		return err
+	}
+
 	if err := updateZiVPNPasswords("/etc/zivpn/config.json"); err != nil {
 		return err
 	}
@@ -174,7 +178,7 @@ WantedBy=multi-user.target
 	if err := runCommand(ctx, "systemctl", "enable", "zivpn.service"); err != nil {
 		return err
 	}
-	if err := runCommand(ctx, "systemctl", "start", "zivpn.service"); err != nil {
+	if err := runCommand(ctx, "systemctl", "start", "--no-block", "zivpn.service"); err != nil {
 		return err
 	}
 	if err := runCommand(ctx, "bash", "-c", "iptables -t nat -A PREROUTING -i $(ip -4 route ls|grep default|grep -Po '(?<=dev )(\\S+)'|head -1) -p udp --dport 6000:19999 -j DNAT --to-destination :5667"); err != nil {
