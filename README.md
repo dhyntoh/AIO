@@ -38,13 +38,12 @@ sudo bash install.sh
 > Note: The installer enables CGO and installs `libsqlite3-dev` so the SQLite driver can initialize correctly.
 
 3. **Follow the prompts**
-
-   - Installation Token: `5407046882`
+   
    - Admin Telegram ID
    - Telegram Bot Token
    - Domain/Subdomain
 
-4. **Bot usage**
+5. **Bot usage**
 
    After the installer finishes, the Telegram bot starts automatically. Use `/start` in your bot chat to access the Admin menu.
 
